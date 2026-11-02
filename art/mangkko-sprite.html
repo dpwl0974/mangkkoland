@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>망꼬 스프라이트 시안</title>
+<style>
+  :root { --bg:#f6f1e7; --card:#fffdf8; --ink:#3b2418; --muted:#8a7360; --line:#e6dccb; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: system-ui, "Malgun Gothic", sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { margin:0 0 20px; color:var(--muted); font-size:14px; }
+  h2 { font-size:15px; margin:28px 0 10px; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; text-align:center; }
+  .card span { display:block; font-size:12px; color:var(--muted); margin-top:6px; }
+  canvas { image-rendering: pixelated; display:block; background:
+    repeating-conic-gradient(#efe7d8 0% 25%, #f8f3ea 0% 50%) 0 0 / 16px 16px; border-radius:4px; }
+  .swatches { display:flex; flex-wrap:wrap; gap:8px; }
+  .sw { display:flex; align-items:center; gap:6px; font-size:12px; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+  .sw i { width:16px; height:16px; border-radius:3px; border:1px solid #0002; display:inline-block; }
+  .park { background:#9fcf7a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐕 찐망꼬 픽셀 시안</h1>
+  <p class="sub">32px 기준 · 실제 사진의 무늬(이마 흰 줄, 갈색 눈가·귀, 등 갈색 반점, 갈색 꼬리 + 흰 꼬리 끝, 노란 하네스)를 반영</p>
+
+  <h2>얼굴 (프로필 카드·분양 연출용)</h2>
+  <div class="row" id="faces"></div>
+
+  <h2>옆모습 산책 (게임 화면용, 걷기 4프레임 애니메이션 포함)</h2>
+  <div class="row" id="sides"></div>
+
+  <h2>공원 위 실제 크기 미리보기 (2배·3배)</h2>
+  <div class="row" id="inpark"></div>
+
+  <h2>윤망꼬N 무늬 변형 예시 (같은 몸, 팔레트·반점만 교체)</h2>
+  <div class="row" id="variants"></div>
+
+  <h2>팔레트</h2>
+  <div class="swatches" id="palette"></div>
+</main>
+
+<script>
+// ───────── 팔레트 (사진에서 추출) ─────────
+const PAL = {
+  o: ['#3b2418', '외곽선 (짙은 갈색)'],
+  w: ['#fffaf2', '흰 털'],
+  s: ['#e3d8c8', '흰 털 그림자 / 먼 쪽 다리'],
+  t: ['#cd8a4c', '갈색 무늬'],
+  d: ['#a5652f', '갈색 무늬 그림자'],
+  l: ['#e2b07c', '주근깨 (연갈색)'],
+  e: ['#2a1a12', '눈'],
+  h: ['#ffffff', '눈 하이라이트'],
+  n: ['#1c1717', '코'],
+  p: ['#eaa8a0', '귀 안쪽 (분홍)'],
+  g: ['#f28da0', '혀'],
+  y: ['#e8e27a', '노란 하네스'],
+  Y: ['#c4bd55', '하네스 그림자'],
+  c: ['#f3eedc', '하네스 버클 (크림)'],
+  m: ['#cfe8d6', '에어태그 홀더 (민트)'],
+};
+
+// ───────── 얼굴: 왼쪽 절반(16칸)만 그리고 좌우 대칭 ─────────
+const FACE_BASE = [
+  "................",
+  "................",
+  "................",
+  ".....oooo.......",
+  "...oottdtooooooo",
+  "..ottppdtttttttw",
+  ".otttppdtttttttw",
+  ".odttpdottttttww",
+  ".oddtdoottttttww",
+  "..oddo.ottttttww",
+  "...oo..otteettww",
+  ".......oteheetww",
+  ".......otteettww",
+  ".......otttttwww",
+  ".......ottttwwww",
+  ".......owttwwwww",
+  "........owwwwwww",
+  "........owwwwnnn",
+  "........owwwnnnn",
+  ".........owwwnnn",
+  ".........owwwwwo",
+  "..........owwwoo",
+  "...........owwww",
+  "..........owwwww",
+  ".........owwwwww",
+  "........oyyyyyyy",
+  "........oYYYYYYc",
+  "........owwwwwww",
+  "........owwwwwww",
+];
+const FACE_SMILE_MOUTH = [ // 19~23행 교체: 입 벌리고 혀 내밀기
+  ".........owwwnnn",
+  "........owwwwwwo",
+  "........owooooog",
+  ".........owoggg g".replace(' ', ''),
+  "..........owogg g".replace(' ', ''),
+];
+const FACE_SQUINT_EYES = [ // 10~12행 교체: 햇살 받으며 눈 감은 '음~' 표정
+  ".......ottttttww",
+  ".......otoooottw",
+  ".......ottttttww",
+];
+
+function mirror(half) { return half.map(r => r + r.split('').reverse().join('')); }
+function withRows(base, start, rows) { const b = base.slice(); rows.forEach((r, i) => b[start + i] = r); return b; }
+
+const FACE = mirror(FACE_BASE);
+const FACE_SMILE = mirror(withRows(FACE_BASE, 19, FACE_SMILE_MOUTH));
+const FACE_SQUINT = mirror(withRows(FACE_BASE, 10, FACE_SQUINT_EYES));
+// 에어태그 홀더는 오른쪽(가슴 한쪽)에만
+[FACE, FACE_SMILE, FACE_SQUINT].forEach(f => { f[26] = f[26].slice(0, 18) + 'mm' + f[26].slice(20); f[27] = f[27].slice(0, 18) + 'mm' + f[27].slice(20); });
+
+// ───────── 옆모습 (오른쪽을 봄) : 몸통 + 다리 프레임 ─────────
+const SIDE_BODY = [
+  "................................",
+  "....o...............ooo.........",
+  "...owo.............otddoo.......",
+  "...owo............ottttddo......",
+  "...oto............otttttdwo.....",
+  "...oto............ottttetwwoo...",
+  "....oto...........otttttwwwwwoo.",
+  "....oto..........owttttwwwwwwwnn",
+  ".....oto........owwwwtwwwwwwwwno",
+  ".....otoooooooooowwwwwwwwwooooo.",
+  "....odttwwwyyyyyyyyywwwwo.......",
+  "....ottwwlwyyttttdyywwmwo.......",
+  "....odtwwwwyyttttdyywwmwo.......",
+  "....owwlwwwccwttdwccwwwwo.......",
+  "....owwwwwwyywwwwwyywwwo........",
+  "....owwwwwwYYwwwwwYYwwwo........",
+  ".....owwwwwwwwwwwwwwwwo.........",
+];
+const LEGS = [
+  [ // 프레임 1: 서 있기
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwwosso....ossowwwo......",
+    "......ooooooo.....ooooooo.......",
+  ],
+  [ // 프레임 2: 가까운 다리 앞으로
+    ".....owwo.osso....osso.owwo.....",
+    ".....owwo.osso....osso..owwo....",
+    "....owwo..osso....osso...owwo...",
+    "....owwo..osso....osso...owwo...",
+    "...owwwo..ossso...ossso..owwwo..",
+    "...ooooo..ooooo...ooooo..ooooo..",
+  ],
+  [ // 프레임 3: 서 있기와 같음 (교차 지점)
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwosso.....ossowwo.......",
+    "......owwwosso....ossowwwo......",
+    "......ooooooo.....ooooooo.......",
+  ],
+  [ // 프레임 4: 먼 다리 앞으로
+    ".....osso.owwo....owwo.osso.....",
+    ".....osso.owwo....owwo..osso....",
+    "....osso..owwo....owwo...osso...",
+    "....osso..owwo....owwo...osso...",
+    "...ossso..owwwo...owwwo..ossso..",
+    "...ooooo..ooooo...ooooo..ooooo..",
+  ],
+];
+const SIDE_FRAMES = LEGS.map(l => SIDE_BODY.concat(l));
+
+// 무늬 변형: 반점 위치·색만 바꿔서 윤망꼬N 다양화
+const VARIANTS = [
+  { name: '찐망꼬 무늬 (희귀)', map: {} },
+  { name: '흰+검정', map: { t: '#3d3433', d: '#221c1b', l: '#7a6e6a' } },
+  { name: '검정 + 갈색 주근깨', map: { t: '#2f2826', d: '#1d1817', l: '#c98a4c' } },
+  { name: '레몬', map: { t: '#e3c48a', d: '#c4a066', l: '#f0dcb4' } },
+  { name: '진갈색 + 핑크 하네스', map: { t: '#8a4f28', d: '#5f3418', y: '#f4a7c0', Y: '#d4849e' } },
+];
+
+// ───────── 렌더러 ─────────
+function draw(rows, scale, override = {}, flip = false) {
+  const w = Math.max(...rows.map(r => r.length)), h = rows.length;
+  const c = document.createElement('canvas'); c.width = w * scale; c.height = h * scale;
+  const g = c.getContext('2d');
+  rows.forEach((r, y) => [...r].forEach((ch, x) => {
+    const col = override[ch] || (PAL[ch] && PAL[ch][0]);
+    if (!col) return;
+    g.fillStyle = col;
+    g.fillRect((flip ? w - 1 - x : x) * scale, y * scale, scale, scale);
+  }));
+  return c;
+}
+function card(parent, canvas, label, cls) {
+  const d = document.createElement('div'); d.className = 'card' + (cls ? ' ' + cls : '');
+  d.appendChild(canvas); const s = document.createElement('span'); s.textContent = label; d.appendChild(s);
+  document.getElementById(parent).appendChild(d); return d;
+}
+function animated(frames, scale, override = {}, flip = false) {
+  const first = draw(frames[0], scale, override, flip);
+  const g = first.getContext('2d'); let i = 0;
+  const pre = frames.map(f => draw(f, scale, override, flip));
+  setInterval(() => { i = (i + 1) % pre.length; g.clearRect(0, 0, first.width, first.height); g.drawImage(pre[i], 0, 0); }, 160);
+  return first;
+}
+
+card('faces', draw(FACE, 8), '기본');
+card('faces', draw(FACE_SMILE, 8), '활짝 웃기 (혀)');
+card('faces', draw(FACE_SQUINT, 8), '햇살 음~ (눈 감기)');
+
+card('sides', draw(SIDE_FRAMES[0], 8), '서 있기');
+card('sides', animated(SIDE_FRAMES, 8), '걷기 애니메이션');
+card('sides', animated(SIDE_FRAMES, 8, {}, true), '왼쪽으로 걷기 (좌우 반전)');
+
+card('inpark', animated(SIDE_FRAMES, 2), '2배', 'park');
+card('inpark', animated(SIDE_FRAMES, 3), '3배', 'park');
+card('inpark', draw(FACE_SQUINT, 3), '얼굴 3배', 'park');
+
+VARIANTS.forEach(v => {
+  const d = card('variants', draw(SIDE_FRAMES[0], 4, v.map), v.name);
+  d.insertBefore(draw(FACE, 4, v.map), d.firstChild);
+});
+
+const pal = document.getElementById('palette');
+Object.entries(PAL).forEach(([k, [hex, label]]) => {
+  const s = document.createElement('div'); s.className = 'sw';
+  s.innerHTML = `<i style="background:${hex}"></i>${label} <code>${hex}</code>`; pal.appendChild(s);
+});
+</script>
+</body>
+</html>

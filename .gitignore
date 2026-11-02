@@ -1,0 +1,40 @@
+### Node ###
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+.turbo/
+coverage/
+
+### IntelliJ IDEA / WebStorm ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+
+### VS Code ###
+.vscode/
+
+### Private docs ###
+docs/
+
+### Secrets ###
+.env
+.env.*
+!.env.example
+
+### Logs ###
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Claude Code ###
+CLAUDE.md
+.claude/settings.local.json
