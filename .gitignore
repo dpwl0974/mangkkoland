@@ -38,3 +38,6 @@ Thumbs.db
 ### Claude Code ###
 CLAUDE.md
 .claude/settings.local.json
+
+# 로컬 개발 서버 실행 설정
+.claude/launch.json
